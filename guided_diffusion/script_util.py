@@ -4,6 +4,9 @@ import inspect
 from . import gaussian_diffusion as gd
 from .respace import SpacedDiffusion, space_timesteps
 from .unet import SuperResModel, UNetModel_newpreview, UNetModel_v1preview, EncoderUNetModel
+from .nca_diff import DiffusionNCA, Diffusion_ViTCA_NCA, CBAMDiffNCA
+from .multi_nca_agent import Multi_NCA
+# from .nca_ffparser import DiffusionNCA
 
 NUM_CLASSES = 2
 
@@ -102,26 +105,29 @@ def create_model_and_diffusion(
     dpm_solver,
     version,
 ):
-    model = create_model(
-        image_size,
-        num_channels,
-        num_res_blocks,
-        channel_mult=channel_mult,
-        learn_sigma=learn_sigma,
-        class_cond=class_cond,
-        use_checkpoint=use_checkpoint,
-        attention_resolutions=attention_resolutions,
-        in_ch = in_ch,
-        num_heads=num_heads,
-        num_head_channels=num_head_channels,
-        num_heads_upsample=num_heads_upsample,
-        use_scale_shift_norm=use_scale_shift_norm,
-        dropout=dropout,
-        resblock_updown=resblock_updown,
-        use_fp16=use_fp16,
-        use_new_attention_order=use_new_attention_order,
-        version = version,
-    )
+    # model = create_model(
+    #     image_size,
+    #     num_channels,
+    #     num_res_blocks,
+    #     channel_mult=channel_mult,
+    #     learn_sigma=learn_sigma,
+    #     class_cond=class_cond,
+    #     use_checkpoint=use_checkpoint,
+    #     attention_resolutions=attention_resolutions,
+    #     in_ch = in_ch,
+    #     num_heads=num_heads,
+    #     num_head_channels=num_head_channels,
+    #     num_heads_upsample=num_heads_upsample,
+    #     use_scale_shift_norm=use_scale_shift_norm,
+    #     dropout=dropout,
+    #     resblock_updown=resblock_updown,
+    #     use_fp16=use_fp16,
+    #     use_new_attention_order=use_new_attention_order,
+    #     version = version,
+    # )
+
+    model = CBAMDiffNCA(img_size = image_size)
+
     diffusion = create_gaussian_diffusion(
         steps=diffusion_steps,
         learn_sigma=learn_sigma,

@@ -7,6 +7,7 @@ from guided_diffusion import dist_util, logger
 from guided_diffusion.resample import create_named_schedule_sampler
 from guided_diffusion.bratsloader import BRATSDataset, BRATSDataset3D
 from guided_diffusion.isicloader import ISICDataset
+from guided_diffusion.refugeloader import REFUGEDataset
 from guided_diffusion.custom_dataset_loader import CustomDataset
 from guided_diffusion.script_util import (
     model_and_diffusion_defaults,
@@ -40,6 +41,12 @@ def main():
 
         ds = BRATSDataset3D(args.data_dir, transform_train, test_flag=False)
         args.in_ch = 5
+    elif args.data_name == 'REFUGE':
+        tran_list = [transforms.Resize((args.image_size,args.image_size)), transforms.ToTensor(),]
+        transform_train = transforms.Compose(tran_list)
+
+        ds = REFUGEDataset(args, args.data_dir, transform_train)
+        args.in_ch = 4
     else :
         tran_list = [transforms.Resize((args.image_size,args.image_size)), transforms.ToTensor(),]
         transform_train = transforms.Compose(tran_list)
@@ -100,7 +107,7 @@ def create_argparser():
         microbatch=-1,  # -1 disables microbatches
         ema_rate="0.9999",  # comma-separated list of EMA values
         log_interval=100,
-        save_interval=5000,
+        save_interval=1000,
         resume_checkpoint=None, #"/results/pretrainedmodel.pt"
         use_fp16=False,
         fp16_scale_growth=1e-3,

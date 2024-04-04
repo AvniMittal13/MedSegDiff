@@ -320,6 +320,8 @@ class GaussianDiffusion:
             if self.model_mean_type == ModelMeanType.START_X:
                 pred_xstart = process_xstart(model_output)
             else:
+                # C=1
+                # model_output, model_var_values = th.split(model_output, C, dim=1)
                 pred_xstart = process_xstart(
                     self._predict_xstart_from_eps(x_t=x, t=t, eps=model_output)
                 )
@@ -343,6 +345,7 @@ class GaussianDiffusion:
 
 
     def _predict_xstart_from_eps(self, x_t, t, eps):
+        # print("x_t, eps shapes: ", x_t.shape, eps.shape)
         assert x_t.shape == eps.shape
         return (
             _extract_into_tensor(self.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t
