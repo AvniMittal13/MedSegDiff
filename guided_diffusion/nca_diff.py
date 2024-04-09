@@ -7,7 +7,7 @@ from einops.layers.torch import Rearrange
 from scipy import signal
 import numpy as np
 import torch.utils.checkpoint as checkpoint
-
+from .nn import layer_norm
  
 class BasicNCA(nn.Module):
     r"""Basic implementation of an NCA using a sobel x and y filter for the perception
@@ -57,6 +57,17 @@ class BasicNCA(nn.Module):
         y2 = _perceive_with(x, dy)
         y = torch.cat((x,y1,y2),1)
         return y
+
+    def load_part_state_dict(self, state_dict):
+
+        own_state = self.state_dict()
+        for name, param in state_dict.items():
+            if name not in own_state:
+                    continue
+            if isinstance(param, th.nn.Parameter):
+                # backwards compatibility for serialized parameters
+                param = param.data
+            own_state[name].copy_(param)
 
     def update(self, x_in, fire_rate):
         r"""Update function runs same nca rule on each cell of an image with a random activation
@@ -227,7 +238,9 @@ class DiffusionNCA(BackboneNCA):
     def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
         super(DiffusionNCA, self).__init__(channel_n, fire_rate, device, hidden_size)
         self.drop0 = nn.Dropout(drop_out_rate)
-        self.bn0 = nn.BatchNorm2d(hidden_size) 
+        # self.bn0 = nn.BatchNorm2d(hidden_size) 
+        self.norm0 = nn.LayerNorm([img_size, img_size, hidden_size])
+
 
     def update(self, x_in, fire_rate):
         x = x_in.transpose(1, 3)
@@ -235,9 +248,12 @@ class DiffusionNCA(BackboneNCA):
         dx = dx.transpose(1, 3)
         dx = self.fc0(dx)
         dx = F.leaky_relu(dx)
-        dx = dx.transpose(1, 3)
-        dx = self.bn0(dx)
-        dx = dx.transpose(1, 3)
+        # dx = dx.transpose(1, 3)
+        # dx = self.bn0(dx)
+        # dx = dx.transpose(1, 3)
+        dx = self.norm0(dx)
+
+        # dx = layer_norm(dx.shape[1:]).to(self.device)(dx)
         dx = self.drop0(dx)
         dx = self.fc1(dx)
         if fire_rate is None:
@@ -274,7 +290,7 @@ class DiffusionNCA(BackboneNCA):
         x = checkpoint.checkpoint_sequential(layers_to_checkpoint, steps, x)
         
         x = x.transpose(1,3)
-        return x[:, :1, :, :], x[:, 1, :, :]
+        return x[:, :1, :, :], x[:, 4, :, :]
     
     def seed(self, x):
         seed = torch.zeros((x.shape[0], self.channel_n, x.shape[2], x.shape[3],), dtype=torch.float32, device=self.device)
@@ -291,20 +307,20 @@ class DiffusionNCA_Multi(BackboneNCA):
         """
         super(DiffusionNCA_Multi, self).__init__(channel_n, fire_rate, device, hidden_size)
         self.drop0 = nn.Dropout(drop_out_rate)
-        self.bn0 = nn.BatchNorm2d(hidden_size) 
-        # self.norm0 = nn.LayerNorm([img_size, img_size, hidden_size])
+        # self.bn0 = nn.BatchNorm2d(hidden_size) 
+        self.norm0 = nn.LayerNorm([img_size, img_size, hidden_size])
 
         # Complex
-        self.complex = False
-        if self.complex:
-            self.p0 = nn.Conv2d(channel_n, channel_n, kernel_size=3, stride=1, padding=1, padding_mode="reflect", dtype=torch.complex64)
-            self.p1 = nn.Conv2d(channel_n, channel_n, kernel_size=3, stride=1, padding=1, padding_mode="reflect", dtype=torch.complex64)
-            self.fc0 = nn.Linear(channel_n*3, hidden_size, dtype=torch.complex64)
-            self.fc1 = nn.Linear(hidden_size, channel_n, bias=False, dtype=torch.complex64)
+        # self.complex = False
+        # if self.complex:
+        #     self.p0 = nn.Conv2d(channel_n, channel_n, kernel_size=3, stride=1, padding=1, padding_mode="reflect", dtype=torch.complex64)
+        #     self.p1 = nn.Conv2d(channel_n, channel_n, kernel_size=3, stride=1, padding=1, padding_mode="reflect", dtype=torch.complex64)
+        #     self.fc0 = nn.Linear(channel_n*3, hidden_size, dtype=torch.complex64)
+        #     self.fc1 = nn.Linear(hidden_size, channel_n, bias=False, dtype=torch.complex64)
         #self.p0 = torch.conv2d(channel_n, channel_n, kernel_size=3, stride=1, padding=1, padding_mode="reflect")
         #self.p1 = torch.conv2d(channel_n, channel_n, kernel_size=3, stride=1, padding=1, padding_mode="reflect")
 
-    def update(self, x_in, fire_rate):
+    def update(self, x_in, fire_rate=0.5):
         r"""
         stochastic update stage of NCA
         :param x_in: perception vector
@@ -321,18 +337,19 @@ class DiffusionNCA_Multi(BackboneNCA):
         dx = self.fc0(dx)
         dx = F.leaky_relu(dx)  # .relu(dx)
 
-        dx = dx.transpose(1, 3)
-        dx = self.bn0(dx)
-        dx = dx.transpose(1, 3)
+        # dx = dx.transpose(1, 3)
+        # dx = self.bn0(dx)
+        # dx = dx.transpose(1, 3)
 
-        # dx = self.norm0(dx)
+        dx = self.norm0(dx)
+        # dx = layer_norm(dx.shape[1:]).to(self.device)(dx)
         dx = self.drop0(dx)
 
         dx = self.fc1(dx)
 
         if fire_rate is None:
             fire_rate = self.fire_rate
-        stochastic = torch.rand([dx.size(0), dx.size(1), dx.size(2), 1]) > fire_rate
+        stochastic = torch.rand([dx.size(0), dx.size(1), dx.size(2), 1]).to(self.device) > fire_rate
         stochastic = stochastic.float().to(self.device)
         dx = dx * stochastic
 
@@ -357,6 +374,7 @@ class DiffusionNCA_Multi(BackboneNCA):
         # x = self.seed(x)
         x = x.transpose(1, 3)
         t = torch.tensor(t).to(self.device)
+        fire_rate = torch.tensor(fire_rate).to(self.device)
 
         scaled_t = t.expand(1, x.shape[1], x.shape[2], x.shape[0])#,x.shape[2],1
         scaled_t = scaled_t.transpose(0, 3)

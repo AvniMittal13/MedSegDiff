@@ -84,6 +84,7 @@ def main():
     from collections import OrderedDict
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
+        print(k)
         # name = k[7:] # remove `module.`
         if 'module.' in k:
             new_state_dict[k[7:]] = v
@@ -91,6 +92,7 @@ def main():
         else:
             new_state_dict = state_dict
 
+    print(new_state_dict)
     model.load_state_dict(new_state_dict)
 
     model.to(dist_util.dev())

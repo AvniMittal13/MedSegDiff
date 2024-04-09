@@ -5,7 +5,7 @@ from . import gaussian_diffusion as gd
 from .respace import SpacedDiffusion, space_timesteps
 from .unet import SuperResModel, UNetModel_newpreview, UNetModel_v1preview, EncoderUNetModel
 from .nca_diff import DiffusionNCA, Diffusion_ViTCA_NCA, CBAMDiffNCA
-from .multi_nca_agent import Multi_NCA
+from .multi_nca_agent import Multi_NCA, MedSegDiff_NCA
 # from .nca_ffparser import DiffusionNCA
 
 NUM_CLASSES = 2

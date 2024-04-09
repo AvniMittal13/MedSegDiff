@@ -157,7 +157,7 @@ def main():
                 #     print('pred max is', pred.max())
                 #     vutils.save_image(pred, fp = os.path.join('./results/' + str(ind)+'pred.jpg'), nrow = 1, padding = 10)
                 gt = torchvision.transforms.PILToTensor()(gt)
-                gt = torchvision.transforms.Resize((32,32))(gt) ## modify
+                gt = torchvision.transforms.Resize((256, 256))(gt) ## modify
                 gt = torch.unsqueeze(gt,0).float() / 255.0
                 # if args.debug:
                 #     vutils.save_image(gt, fp = os.path.join('./results/' + str(ind)+'gt.jpg'), nrow = 1, padding = 10)
