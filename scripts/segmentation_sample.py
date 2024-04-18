@@ -80,7 +80,7 @@ def main():
     all_images = []
 
 
-    state_dict = dist_util.load_state_dict(args.model_path, map_location="cpu")
+    state_dict = dist_util.load_state_dict(args.model_path, map_location=dist_util.dev())
     from collections import OrderedDict
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
@@ -95,6 +95,7 @@ def main():
     print(new_state_dict)
     model.load_state_dict(new_state_dict)
 
+    print("device :", dist_util.dev())
     model.to(dist_util.dev())
     if args.use_fp16:
         model.convert_to_fp16()
@@ -108,6 +109,8 @@ def main():
         elif args.data_name == 'BRATS':
             # slice_ID=path[0].split("_")[2] + "_" + path[0].split("_")[4]
             slice_ID=path[0].split("_")[-3] + "_" + path[0].split("slice")[-1].split('.nii')[0]
+        elif args.data_name == 'REFUGE':
+            slice_ID = path[0].split('.')[0]
 
         logger.log("sampling...")
 
@@ -143,7 +146,7 @@ def main():
                 # print('sample size is',sample.size())
                 # print('org size is',org.size())
                 # print('cal size is',cal.size())
-                if args.data_name == 'ISIC':
+                if args.data_name == 'ISIC' or args.data_name == 'REFUGE':
                     # s = th.tensor(sample)[:,-1,:,:].unsqueeze(1).repeat(1, 3, 1, 1)
                     o = th.tensor(org)[:,:-1,:,:]
                     c = th.tensor(cal).repeat(1, 3, 1, 1)
@@ -161,7 +164,7 @@ def main():
                     tup = (ss,o,c)
                 elif args.data_name == 'BRATS':
                     s = th.tensor(sample)[:,-1,:,:].unsqueeze(1)
-                    m = th.tensor(m.to(device = 'cuda:0'))[:,0,:,:].unsqueeze(1)
+                    m = th.tensor(m.to(device = 'cuda'))[:,0,:,:].unsqueeze(1)
                     o1 = th.tensor(org)[:,0,:,:].unsqueeze(1)
                     o2 = th.tensor(org)[:,1,:,:].unsqueeze(1)
                     o3 = th.tensor(org)[:,2,:,:].unsqueeze(1)

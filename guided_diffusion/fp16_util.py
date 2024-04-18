@@ -121,7 +121,27 @@ def state_dict_to_master_params(model, state_dict, use_fp16):
         param_groups_and_shapes = get_param_groups_and_shapes(named_model_params)
         master_params = make_master_params(param_groups_and_shapes)
     else:
-        master_params = [state_dict[name] for name, _ in model.named_parameters()]
+        print("print in ema")
+        [print(name) for name, _ in model.named_parameters()]
+        isModule = False
+        # for name, _ in model.named_parameters():
+        #     print(name)
+        #     if "module" in name:
+        #         isModule = True
+        #         break
+        print(state_dict.keys())
+        for key in state_dict.keys():
+            if "module" in key:
+                isModule = True
+                break
+                # print(f'Found key containing "module": {key}')
+        
+        if isModule:
+            master_params = [state_dict["module."+name] for name, _ in model.named_parameters()]
+        else:
+            print("without module")
+            master_params = [state_dict[name] for name, _ in model.named_parameters()]
+
     return master_params
 
 

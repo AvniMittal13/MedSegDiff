@@ -53,13 +53,16 @@ class REFUGEDataset(Dataset):
 
         img = Image.open(img_path).convert('RGB')
         mask = Image.open(msk_path).convert('L')
-        print(img.size, mask.size)
+        # print(mask)
+        # print(img.size, mask.size)
 
         if self.transform:
             state = torch.get_rng_state()
             img = self.transform(img)
             torch.set_rng_state(state)
             mask = self.transform(mask)
+
+        mask = torch.abs(1 - mask)
 
 
         return (img, mask, name)

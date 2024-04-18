@@ -91,6 +91,7 @@ class TrainLoop:
             self.mp_trainer.master_params, lr=self.lr, weight_decay=self.weight_decay
         )
         if self.resume_step:
+            print("in resume step")
             self._load_optimizer_state()
             # Model was resumed, either due to a restart or a checkpoint
             # being specified at the command line.
@@ -331,7 +332,7 @@ def find_resume_checkpoint():
 def find_ema_checkpoint(main_checkpoint, step, rate):
     if main_checkpoint is None:
         return None
-    filename = f"ema_{rate}_{(step):06d}.pt"
+    filename = f"emasavedmodel_{rate}_{(step):06d}.pt"
     path = bf.join(bf.dirname(main_checkpoint), filename)
     if bf.exists(path):
         return path

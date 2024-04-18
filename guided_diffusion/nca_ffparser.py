@@ -145,7 +145,7 @@ class BackboneNCA(BasicNCA):
 class DiffusionNCA(BackboneNCA):
     r"""Implementation of Diffusion NCA
     """
-    def __init__(self, channel_n = 32, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
+    def __init__(self, channel_n = 32, fire_rate=0.5, device="cuda", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
         r"""Init function
         """
         super(DiffusionNCA, self).__init__(channel_n, fire_rate, device, hidden_size)

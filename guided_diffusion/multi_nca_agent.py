@@ -2,13 +2,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .nca_diff import DiffusionNCA_Multi
+from .nca_diff import DiffusionNCA_Multi, DiffusionNCA_Multi2
 from .nn import layer_norm
 
 class Multi_NCA(nn.Module):
     r"""Implementation of Diffusion NCA
     """
-    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=512, input_channels=1, drop_out_rate=0.25, img_size=32):
         r"""Init function
         """
         super(Multi_NCA, self).__init__()
@@ -17,9 +17,38 @@ class Multi_NCA(nn.Module):
         ## nca1 - downsampled image, nca2 - patches
         self.channel_n = channel_n
         self.device = device
-        self.nca1 = DiffusionNCA_Multi(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate)
-        self.nca2 = DiffusionNCA_Multi(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate)
+        self.nca1 = DiffusionNCA_Multi(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size//4)
+        self.nca2 = DiffusionNCA_Multi2(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
         # img_size and img_size//4
+
+    def load_part_state_dict(self, state_dict):
+
+        own_state = self.state_dict()
+        # keys = "module." + own_state.keys() 
+        print("pt2", own_state.keys())
+        # print("loading1 ", own_state)
+
+        for name, param in state_dict.items():
+            print(name)
+            if "module" in name:
+                    
+                if name[7:] not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name[7:]].copy_(param)
+
+            else:
+
+                if name not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name].copy_(param)
 
     def forward(self, x, t=0):
         # nca2
@@ -75,7 +104,7 @@ class FFParser(nn.Module):
 class MedSegDiff_NCA(nn.Module):
     r"""Implementation of Diffusion NCA
     """
-    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=512, input_channels=1, drop_out_rate=0.25, img_size=32):
         r"""Init function
         """
         super(MedSegDiff_NCA, self).__init__()
@@ -85,12 +114,41 @@ class MedSegDiff_NCA(nn.Module):
         self.channel_n = channel_n
         self.device = device
 
-        self.nca_noise = DiffusionNCA_Multi(channel_n-4, fire_rate, device, hidden_size, input_channels, drop_out_rate)
-        self.nca_img = DiffusionNCA_Multi(channel_n-2, fire_rate, device, hidden_size, input_channels, drop_out_rate)
-        self.nca_final = DiffusionNCA_Multi(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate)
+        self.nca_noise = DiffusionNCA_Multi(channel_n-4, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
+        self.nca_img = DiffusionNCA_Multi(channel_n-2, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
+        self.nca_final = DiffusionNCA_Multi2(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
 
         self.ffparser = FFParser(dim = channel_n-4, img_size = img_size)
         # img_size and img_size//4
+
+    def load_part_state_dict(self, state_dict):
+
+        own_state = self.state_dict()
+        # keys = "module." + own_state.keys() 
+        print("pt2", own_state.keys())
+        # print("loading1 ", own_state)
+
+        for name, param in state_dict.items():
+            print(name)
+            if "module" in name:
+                    
+                if name[7:] not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name[7:]].copy_(param)
+
+            else:
+
+                if name not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name].copy_(param)
 
     def enhance(self, c, h):
         cu = layer_norm(c.shape[1:]).to(self.device)(c)
