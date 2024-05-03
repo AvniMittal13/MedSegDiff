@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .nca_diff import DiffusionNCA_Multi, DiffusionNCA_Multi2
+from .nca_diff import DiffusionNCA_Multi, DiffusionNCA_Multi2, CBAMDiffNCAMulti, CBAMDiffNCAMulti2
 from .nn import layer_norm
 
 class Multi_NCA(nn.Module):
@@ -66,7 +66,79 @@ class Multi_NCA(nn.Module):
         y2 = self.nca2(x2, t)
     
         # return y2
-        return y2[:, :1, :, :], y2[:, 4, :, :]
+        return y2[:, :1, :, :], y2[:, 1, :, :]
+        
+    def seed(self, x):
+        seed = torch.zeros((x.shape[0], self.channel_n, x.shape[2], x.shape[3],), dtype=torch.float32, device=self.device)
+        in_channels = x.shape[1]
+        seed[:, 1:1+in_channels, :,:] = x
+        return seed
+
+
+
+class CBAM_Multi_NCA(nn.Module):
+    r"""Implementation of Diffusion NCA
+    """
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=512, input_channels=1, output_channel=1,drop_out_rate=0.25, img_size=32):
+        r"""Init function
+        """
+        super(CBAM_Multi_NCA, self).__init__()
+
+        ## nca models in levels
+        ## nca1 - downsampled image, nca2 - patches
+        self.channel_n = channel_n
+        self.device = device
+        self.nca1 = CBAMDiffNCAMulti(channel_n, fire_rate, device, hidden_size, input_channels, output_channel,drop_out_rate, img_size//4)
+        # self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=512, input_channels=1, output_channel = 1, drop_out_rate=0.5, img_size=28, steps = 10, bias = False, r = 16
+        self.nca2 = CBAMDiffNCAMulti2(channel_n, fire_rate, device, hidden_size, input_channels, output_channel, drop_out_rate, img_size)
+        # img_size and img_size//4
+
+    def load_part_state_dict(self, state_dict):
+
+        own_state = self.state_dict()
+        # keys = "module." + own_state.keys() 
+        print("pt2", own_state.keys())
+        # print("loading1 ", own_state)
+
+        for name, param in state_dict.items():
+            print(name)
+            if "module" in name:
+                    
+                if name[7:] not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name[7:]].copy_(param)
+
+            else:
+
+                if name not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name].copy_(param)
+
+    def forward(self, x, t=0):
+        # nca2
+        down_scaled_size = (int(x.shape[2] // 4), int(x.shape[3] // 4))
+        x_resized = F.interpolate(x, size=down_scaled_size, mode='bilinear', align_corners=False)
+        
+        x1 = self.seed(x_resized)
+        y1 = self.nca1(x1, t)
+
+        # nca2 
+        up = torch.nn.Upsample(scale_factor=4, mode='nearest')
+        x2 = up(y1)
+
+        x2[:, 1:1+x.shape[1], :, :] = x
+        y2 = self.nca2(x2, t)
+    
+        # return y2
+        return y2[:, :1, :, :], y2[:, 1, :, :]
         
     def seed(self, x):
         seed = torch.zeros((x.shape[0], self.channel_n, x.shape[2], x.shape[3],), dtype=torch.float32, device=self.device)
@@ -104,7 +176,7 @@ class FFParser(nn.Module):
 class MedSegDiff_NCA(nn.Module):
     r"""Implementation of Diffusion NCA
     """
-    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=512, input_channels=1, drop_out_rate=0.25, img_size=32):
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
         r"""Init function
         """
         super(MedSegDiff_NCA, self).__init__()
@@ -178,7 +250,95 @@ class MedSegDiff_NCA(nn.Module):
         y3 = self.nca_final(x3, t)
     
         # return y2
-        return y3[:, :1, :, :], y3[:, 4, :, :]
+        return y3[:, :1, :, :], y3[:, 1, :, :]
+        # return y3
+        
+    def seed(self, x, channels, start=1):
+        seed = torch.zeros((x.shape[0], channels , x.shape[2], x.shape[3],), dtype=torch.float32, device=self.device)
+        in_channels = x.shape[1]
+        seed[:, start:start+in_channels, :,:] = x
+        return seed
+
+class MedSegDiff_NCA2(nn.Module):
+    r"""Implementation of Diffusion NCA
+    """
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
+        r"""Init function
+        """
+        super(MedSegDiff_NCA2, self).__init__()
+
+        ## nca models in levels
+        ## nca1 - downsampled image, nca2 - patches
+        self.channel_n = channel_n
+        self.device = device
+
+        self.nca_noise = DiffusionNCA_Multi(channel_n-4, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
+        # self.nca_img = DiffusionNCA_Multi(channel_n-2, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
+        self.nca_final = DiffusionNCA_Multi2(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
+
+        self.ffparser = FFParser(dim = channel_n-4, img_size = img_size)
+        # img_size and img_size//4
+
+    def load_part_state_dict(self, state_dict):
+
+        own_state = self.state_dict()
+        # keys = "module." + own_state.keys() 
+        print("pt2", own_state.keys())
+        # print("loading1 ", own_state)
+
+        for name, param in state_dict.items():
+            print(name)
+            if "module" in name:
+                    
+                if name[7:] not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name[7:]].copy_(param)
+
+            else:
+
+                if name not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name].copy_(param)
+
+    def enhance(self, c, h):
+        cu = layer_norm(c.shape[1:]).to(self.device)(c)
+        hu = layer_norm(h.shape[1:]).to(self.device)(h)
+        return cu * hu * h
+
+    def forward(self, x, t=0):  
+
+        num_chans = self.channel_n-1-x.shape[1]      
+
+        x1 = self.seed(x[:, -1:, :, :], num_chans+1, 0)
+        y1 = self.nca_noise(x1, t)
+        # print(y1.shape)
+        y1 = self.ffparser(y1)  # batch, channel, height, width
+        # y1 = y1.view(x.shape[0], self.channel_n, -1)
+
+        # pass to ff parser
+
+        # x2 = self.seed(x[:, :-1, :, :], num_chans+x.shape[1]-1, 0)
+        # y2 = self.nca_img(x2, t)
+
+        # print(y2[:,x.shape[1]-1:,:,:].shape, y1[:,1:,:,:].shape)
+        # combined = self.enhance(y1[:,1:,:,:], y2[:,x.shape[1]-1:,:,:])
+        # combined = y + y1[:,1:,:,:]
+        # x3 = torch.cat((y2[:, :x.shape[1]-1, :, :], y1[:, :1, :, :], combined), dim=1)
+
+        x3 = torch.cat((x[:, :-1, :, :], y1), dim=1)
+        x3 = self.seed(x3, self.channel_n, 1)
+        y3 = self.nca_final(x3, t)
+    
+        # return y2
+        return y3[:, :1, :, :], y1[:, 0, :, :]
         # return y3
         
     def seed(self, x, channels, start=1):

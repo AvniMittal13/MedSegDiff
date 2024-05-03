@@ -5,7 +5,7 @@ from . import gaussian_diffusion as gd
 from .respace import SpacedDiffusion, space_timesteps
 from .unet import SuperResModel, UNetModel_newpreview, UNetModel_v1preview, EncoderUNetModel
 from .nca_diff import DiffusionNCA, Diffusion_ViTCA_NCA, CBAMDiffNCA, DiffusionNCA2
-from .multi_nca_agent import Multi_NCA, MedSegDiff_NCA
+from .multi_nca_agent import Multi_NCA, MedSegDiff_NCA, CBAM_Multi_NCA, MedSegDiff_NCA2
 # from .nca_ffparser import DiffusionNCA
 
 NUM_CLASSES = 2
@@ -126,7 +126,7 @@ def create_model_and_diffusion(
     #     version = version,
     # )
 
-    model = Multi_NCA(img_size = image_size)
+    model = CBAM_Multi_NCA(img_size = image_size)
 
     diffusion = create_gaussian_diffusion(
         steps=diffusion_steps,

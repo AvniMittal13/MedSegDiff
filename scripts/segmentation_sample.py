@@ -105,13 +105,14 @@ def main():
         c = th.randn_like(b[:, :1, ...])
         img = th.cat((b, c), dim=1)     #add a noise channel$
         if args.data_name == 'ISIC':
-            slice_ID=path[0].split("_")[-1].split('.')[0]
+            slice_ID = [p.split("_")[-1].split('.')[0] for p in path]
+            # slice_ID=path[0].split("_")[-1].split('.')[0]
         elif args.data_name == 'BRATS':
             # slice_ID=path[0].split("_")[2] + "_" + path[0].split("_")[4]
             slice_ID=path[0].split("_")[-3] + "_" + path[0].split("slice")[-1].split('.nii')[0]
         elif args.data_name == 'REFUGE':
-            slice_ID = path[0].split('.')[0]
-
+            # slice_ID = path[0].split('.')[0]
+            slice_ID = [p.split('.')[0] for p in path]
         logger.log("sampling...")
 
         start = th.cuda.Event(enable_timing=True)
@@ -175,8 +176,16 @@ def main():
 
                 compose = th.cat(tup,0)
                 vutils.save_image(compose, fp = os.path.join(args.out_dir, str(slice_ID)+'_output'+str(i)+".jpg"), nrow = 1, padding = 10)
+        
+     
         ensres = staple(th.stack(enslist,dim=0)).squeeze(0)
-        vutils.save_image(ensres, fp = os.path.join(args.out_dir, str(slice_ID)+'_output_ens'+".jpg"), nrow = 1, padding = 10)
+        for img, slice_id in zip(ensres, slice_ID):
+            # print("img, ", img.shape, slice_id)
+            if args.data_name == 'REFUGE':
+                img = th.abs(1 - img)
+
+            vutils.save_image(img, fp = os.path.join(args.out_dir, str(slice_id)+'_output_ens'+".jpg"), nrow = 1, padding = 10)
+        # vutils.save_image(ensres, fp = os.path.join(args.out_dir, str(slice_ID)+'_output_ens'+".jpg"), nrow = 1, padding = 10)
 
 def create_argparser():
     defaults = dict(

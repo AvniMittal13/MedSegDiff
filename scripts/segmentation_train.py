@@ -122,4 +122,17 @@ def create_argparser():
 
 
 if __name__ == "__main__":
+
+    import torch
+
+    # Get the number of available GPUs
+    num_gpus = torch.cuda.device_count()
+
+    # Set visible devices
+    for i in range(num_gpus):
+        torch.cuda.set_device(i)
+
+    # Check if PyTorch detects all GPUs
+    print("Number of GPUs:", torch.cuda.device_count())
+
     main()

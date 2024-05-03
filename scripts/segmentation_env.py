@@ -149,6 +149,7 @@ def main():
                 ind = name.split('_')[0]
                 pred = Image.open(os.path.join(root, name)).convert('L')
                 gt_name = "ISIC_" + ind + "_Segmentation.png"
+                # gt_name = ind + ".bmp"  # REFUGE
                 gt = Image.open(os.path.join(gt_path, gt_name)).convert('L')
                 pred = torchvision.transforms.PILToTensor()(pred)
                 pred = torch.unsqueeze(pred,0).float() 
@@ -157,8 +158,10 @@ def main():
                 #     print('pred max is', pred.max())
                 #     vutils.save_image(pred, fp = os.path.join('./results/' + str(ind)+'pred.jpg'), nrow = 1, padding = 10)
                 gt = torchvision.transforms.PILToTensor()(gt)
-                gt = torchvision.transforms.Resize((128, 128))(gt) ## modify
+                gt = torchvision.transforms.Resize((256, 256))(gt) ## modify
                 gt = torch.unsqueeze(gt,0).float() / 255.0
+
+                # gt = torch.abs(1 - gt) # REFUGE
                 # if args.debug:
                 #     vutils.save_image(gt, fp = os.path.join('./results/' + str(ind)+'gt.jpg'), nrow = 1, padding = 10)
                 temp = eval_seg(pred, gt)

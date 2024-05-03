@@ -7,6 +7,8 @@ from torch.autograd import Variable
 import enum
 import torch.nn.functional as F
 from torchvision.utils import save_image
+import matplotlib.pyplot as plt
+
 import torch
 import math
 import os
@@ -621,7 +623,6 @@ class GaussianDiffusion:
 
         if device is None:
             device = next(model.parameters()).device
-        print("in training loop", device)
         assert isinstance(shape, (tuple, list))
         if noise is not None:
             img = noise
@@ -638,7 +639,6 @@ class GaussianDiffusion:
 
         else:
            for i in indices:
-                print("index: ", i)
                 t = th.tensor([i] * shape[0], device=device)
                 # if i%100==0:
                     # print('sampling step', i)
@@ -992,24 +992,83 @@ class GaussianDiffusion:
             model_kwargs = {}
         if noise is None:
             noise = th.randn_like(x_start[:, -1:, ...])
+        
+        import random
+
+        random_number = random.randint(1, 1000)
+
+        print("xstart, noise, ", x_start.shape, noise.shape)
+
 
 
         mask = x_start[:, -1:, ...]
         res = torch.where(mask > 0, 1, 0)   #merge all tumor classes into one to get a binary segmentation mask
 
+        print("mask, res: ", mask.shape, res.shape)
         res_t = self.q_sample(res, t, noise=noise)     #add noise to the segmentation channel
         x_t=x_start.float()
+        print("rest, xt", res_t.shape, x_t.shape)
         x_t[:, -1:, ...]=res_t.float()
+
+        ## print all of xt
+        tensor = x_t[0].cpu()
+        print(tensor.shape)
+        # Plotting
+        fig, axs = plt.subplots(1 ,4, figsize=(12,3))
+
+        for i in range(4):
+            axs[i].imshow(tensor[i].cpu().numpy(), cmap='gray')
+            axs[i].axis('off')
+
+        plt.savefig('channel_images'+str(random_number)+'.png')
+        plt.show()
+
         terms = {}
 
 
         if self.loss_type == LossType.MSE or self.loss_type == LossType.BCE_DICE or self.loss_type == LossType.RESCALED_MSE:
 
             model_output, cal = model(x_t, self._scale_timesteps(t), **model_kwargs)
+            
+            print("model output, cal: ", model_output.shape, cal.shape)
+            tensor1 = model_output[0][0].cpu()
+            tensor2 = cal[0].cpu()
+            tensor3 = res[0][0].cpu()
+            print(tensor.shape)
+
+            fig, axs = plt.subplots(1, 3, figsize=(8, 4))
+
+            axs[0].imshow(tensor1.detach().numpy(), cmap='gray')
+            axs[0].axis('off')
+            axs[0].set_title('Tensor 1')
+
+            axs[1].imshow(tensor2.detach().numpy(), cmap='gray')
+            axs[1].axis('off')
+            axs[1].set_title('Tensor 2')
+
+            axs[2].imshow(tensor3.detach().numpy(), cmap='gray')
+            axs[2].axis('off')
+            axs[2].set_title('Tensor 2')
+
+            plt.savefig('tensor_images'+str(random_number)+'.png')
+            plt.show()
+            # Plotting
+            # fig, axs = plt.subplots(1 ,4, figsize=(12,3))
+
+            # for i in range(4):
+            #     axs[i].imshow(tensor[i].cpu().numpy(), cmap='gray')
+            #     axs[i].axis('off')
+
+            # plt.savefig('channel_images2.png')
+            # plt.show()
+            
             if self.model_var_type in [
                 ModelVarType.LEARNED,
                 ModelVarType.LEARNED_RANGE,
             ]:
+
+                ## print all of xt
+
                 B, C = x_t.shape[:2]
                 C=1
                 assert model_output.shape == (B, C * 2, *x_t.shape[2:])

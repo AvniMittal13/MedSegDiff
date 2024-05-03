@@ -1040,6 +1040,14 @@ class GaussianDiffusion:
             # model_output = (cal > 0.5) * (model_output >0.5) * model_output if 2. * (cal*model_output).sum() / (cal+model_output).sum() < 0.75 else model_output
             # terms["loss_diff"] = nn.BCELoss(model_output, target)
             terms["loss_diff"] = mean_flat((target - model_output) ** 2 )
+
+            ## TODO
+            ## generate image without noise by subtacting noise
+            res_pred = 
+
+            ## calculate bce dice loss with denoised image and original segmentation map
+            terms["loss_dice"] = BCE_DICE_loss(res, res_pred)
+
             terms["loss_cal"] = mean_flat((res - cal) ** 2)
             # terms["loss_cal"] = nn.BCELoss()(cal.type(th.float), res.type(th.float)) 
             # terms["mse"] = (terms["mse_diff"] + terms["mse_cal"]) / 2.

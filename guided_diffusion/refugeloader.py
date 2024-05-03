@@ -48,7 +48,7 @@ class REFUGEDataset(Dataset):
 
         mask_name = name.split(".")[0]+".bmp"
         msk_path = os.path.join(os.path.join(self.data_path, self.mode, "mask"), mask_name)
-        print("names: ", name, img_path, mask_name, msk_path)
+        # print("names: ", name, img_path, mask_name, msk_path)
 
 
         img = Image.open(img_path).convert('RGB')

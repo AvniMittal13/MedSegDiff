@@ -15,7 +15,7 @@ import torch.utils.checkpoint as checkpoint2
 class BasicNCA(nn.Module):
     r"""Basic implementation of an NCA using a sobel x and y filter for the perception
     """
-    def __init__(self, channel_n=60, fire_rate=0.5, device="cuda", hidden_size=128, input_channels=1, init_method="standard"):
+    def __init__(self, channel_n=60, fire_rate=0.5, device="cuda:0", hidden_size=128, input_channels=1, init_method="standard"):
         r"""Init function
             #Args:
                 channel_n: number of channels per cell
@@ -186,7 +186,7 @@ class BackboneNCA(BasicNCA):
 # class DiffusionNCA(BackboneNCA):
 #     r"""Implementation of Diffusion NCA
 #     """
-#     def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
+#     def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
 #         r"""Init function
 #         """
 #         super(DiffusionNCA, self).__init__(channel_n, fire_rate, device, hidden_size)
@@ -285,10 +285,10 @@ class BackboneNCA(BasicNCA):
 #         return seed
 
 class DiffusionNCA(BackboneNCA):
-    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=512, input_channels=1, drop_out_rate=0.25, img_size=32):
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
         super(DiffusionNCA, self).__init__(channel_n, fire_rate, device, hidden_size)
         self.drop0 = nn.Dropout(drop_out_rate)
-        self.bn0 = nn.BatchNorm2d(hidden_size) 
+        # self.bn0 = nn.BatchNorm2d(hidden_size) 
         self.norm0 = nn.LayerNorm([img_size, img_size, hidden_size])
 
 
@@ -298,9 +298,9 @@ class DiffusionNCA(BackboneNCA):
         dx = dx.transpose(1, 3)
         dx = self.fc0(dx)
         dx = F.leaky_relu(dx)
-        dx = dx.transpose(1, 3)
-        dx = self.bn0(dx)
-        dx = dx.transpose(1, 3)
+        # dx = dx.transpose(1, 3)
+        # dx = self.bn0(dx)
+        # dx = dx.transpose(1, 3)
 
         dx = self.norm0(dx)
         # dx = layer_norm(dx.shape[1:]).to(self.device)(dx)
@@ -308,7 +308,7 @@ class DiffusionNCA(BackboneNCA):
         dx = self.fc1(dx)
         if fire_rate is None:
             fire_rate = self.fire_rate
-        stochastic = torch.rand([dx.size(0), dx.size(1), dx.size(2), 1]) > fire_rate
+        stochastic = torch.rand([dx.size(0), dx.size(1), dx.size(2), 1]).to(self.device) > fire_rate.to(self.device)
         stochastic = stochastic.float().to(self.device)
         dx = dx * stochastic
         x = x + dx.transpose(1, 3)
@@ -331,6 +331,8 @@ class DiffusionNCA(BackboneNCA):
             x_count = (x_count + torch.transpose(x_count, 1,2)) / 2
             x[:, :, :, -2:-1] = x_count
         
+        fire_rate = torch.tensor(fire_rate).to(self.device)
+        
         # Define a sequence of layers to checkpoint
         layers_to_checkpoint = [
             lambda x: self.update(x, fire_rate).clone() for _ in range(steps)
@@ -340,7 +342,7 @@ class DiffusionNCA(BackboneNCA):
         x = checkpoint2.checkpoint_sequential(layers_to_checkpoint, steps, x)
         
         x = x.transpose(1,3)
-        return x[:, :1, :, :], x[:, 4, :, :]
+        return x[:, :1, :, :], x[:, 1, :, :]
     
     def seed(self, x):
         seed = torch.zeros((x.shape[0], self.channel_n, x.shape[2], x.shape[3],), dtype=torch.float32, device=self.device)
@@ -349,7 +351,7 @@ class DiffusionNCA(BackboneNCA):
         return seed
 
 class DiffusionNCA2(BackboneNCA):
-    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=512, input_channels=1, drop_out_rate=0.25, img_size=32):
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
         super(DiffusionNCA2, self).__init__(channel_n, fire_rate, device, hidden_size)
         self.drop0 = nn.Dropout(drop_out_rate)
         # self.bn0 = nn.BatchNorm2d(hidden_size) 
@@ -422,7 +424,7 @@ class DiffusionNCA2(BackboneNCA):
 # class DiffusionNCA_Multi(BackboneNCA):
 #     r"""Implementation of Diffusion NCA
 #     """
-#     def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
+#     def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
 #         r"""Init function
 #         """
 #         super(DiffusionNCA_Multi, self).__init__(channel_n, fire_rate, device, hidden_size)
@@ -525,7 +527,7 @@ class DiffusionNCA2(BackboneNCA):
 class DiffusionNCA_Multi(BackboneNCA):
     r"""Implementation of Diffusion NCA
     """
-    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=512, input_channels=1, drop_out_rate=0.25, img_size=32):
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
         r"""Init function
         """
         super(DiffusionNCA_Multi, self).__init__(channel_n, fire_rate, device, hidden_size)
@@ -636,7 +638,7 @@ class DiffusionNCA_Multi(BackboneNCA):
 class DiffusionNCA_Multi2(BackboneNCA):
     r"""Implementation of Diffusion NCA
     """
-    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=512, input_channels=1, drop_out_rate=0.25, img_size=32):
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32):
         r"""Init function
         """
         super(DiffusionNCA_Multi2, self).__init__(channel_n, fire_rate, device, hidden_size)
@@ -863,7 +865,7 @@ def neighbourhood_filters(neighbourhood_size, device):
 class Diffusion_ViTCA_NCA(BackboneNCA):
     r"""Implementation of Diffusion NCA
     """
-    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=128, input_channels=1, drop_out_rate=0.25, img_size=28,
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=128, input_channels=1, drop_out_rate=0.25, img_size=28,
                  depth=1, heads=4, mlp_dim=64, dropout=0., embed_dim = 16):
         r"""Init function
         """
@@ -1102,9 +1104,136 @@ class CBAMDiffNCA(DiffusionNCA):
     r"""
         NCA to include global image information
     """
-    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=512, input_channels=1, output_channel = 1, drop_out_rate=0.5, img_size=28, steps = 10, bias = False, r = 16):
-        # self, channel_n = 64, fire_rate=0.5, device="cuda", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=512, input_channels=1, output_channel = 1, drop_out_rate=0.5, img_size=28, steps = 10, bias = False, r = 16):
+        # self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32
         super(CBAMDiffNCA, self).__init__(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
+        self.sam = SAM(bias)
+        self.cam = CAM(channels=channel_n, r=r)
+
+    def load_part_state_dict(self, state_dict):
+
+        own_state = self.state_dict()
+        # keys = "module." + own_state.keys() 
+        print("pt2", own_state.keys())
+        # print("loading1 ", own_state)
+
+        for name, param in state_dict.items():
+            print(name)
+            if "module" in name:
+                    
+                if name[7:] not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name[7:]].copy_(param)
+
+            else:
+
+                if name not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name].copy_(param)
+
+    def cbam_attention(self, x):
+        out = self.cam(x)
+        out = self.sam(out)
+        
+        x = x+out
+        # print(x.shape)
+        return x 
+
+    def perceive(self, x):
+        r"""Perceptive function, combines 2 conv outputs with the identity of the cell
+            #Args:
+                x: image
+        """
+        x = self.cbam_attention(x)
+
+        y1 = self.p0(x)
+        y2 = self.p1(x)
+        # y3 = self.p2(x)
+
+        y = torch.cat((x,y1,y2),1)
+
+        return y
+    
+
+
+class CBAMDiffNCAMulti(DiffusionNCA_Multi):
+    r"""
+        NCA to include global image information
+    """
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=512, input_channels=1, output_channel = 1, drop_out_rate=0.5, img_size=28, steps = 10, bias = False, r = 16):
+        # self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32
+        # elf, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32
+        super(CBAMDiffNCAMulti, self).__init__(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
+        self.sam = SAM(bias)
+        self.cam = CAM(channels=channel_n, r=r)
+
+    def load_part_state_dict(self, state_dict):
+
+        own_state = self.state_dict()
+        # keys = "module." + own_state.keys() 
+        print("pt2", own_state.keys())
+        # print("loading1 ", own_state)
+
+        for name, param in state_dict.items():
+            print(name)
+            if "module" in name:
+                    
+                if name[7:] not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name[7:]].copy_(param)
+
+            else:
+
+                if name not in own_state.keys():
+                        continue
+                if isinstance(param, torch.nn.Parameter):
+                    # backwards compatibility for serialized parameters
+                    param = param.data
+                print("done")
+                own_state[name].copy_(param)
+
+    def cbam_attention(self, x):
+        out = self.cam(x)
+        out = self.sam(out)
+        
+        x = x+out
+        # print(x.shape)
+        return x 
+
+    def perceive(self, x):
+        r"""Perceptive function, combines 2 conv outputs with the identity of the cell
+            #Args:
+                x: image
+        """
+        x = self.cbam_attention(x)
+
+        y1 = self.p0(x)
+        y2 = self.p1(x)
+        # y3 = self.p2(x)
+
+        y = torch.cat((x,y1,y2),1)
+
+        return y
+    
+class CBAMDiffNCAMulti2(DiffusionNCA_Multi2):
+    r"""
+        NCA to include global image information
+    """
+    def __init__(self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=512, input_channels=1, output_channel = 1, drop_out_rate=0.5, img_size=28, steps = 10, bias = False, r = 16):
+        # self, channel_n = 64, fire_rate=0.5, device="cuda:0", hidden_size=256, input_channels=1, drop_out_rate=0.25, img_size=32
+        super(CBAMDiffNCAMulti2, self).__init__(channel_n, fire_rate, device, hidden_size, input_channels, drop_out_rate, img_size)
         self.sam = SAM(bias)
         self.cam = CAM(channels=channel_n, r=r)
 
